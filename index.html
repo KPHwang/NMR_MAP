@@ -91,17 +91,20 @@
                         var lng = parseFloat(loc.경도);
                         if (isNaN(lat) || isNaN(lng)) return;
 
-                        var fullAddress = loc.주소 + (loc.상세주소 ? ' ' + loc.상세주소 : '');
-                        var safeAddress = fullAddress.replace(/'/g, "\\'");
+                        var baseAddress = loc.주소 ? loc.주소.trim() : ""; // 기본 주소만 추출
+                        var detailAddress = loc.상세주소 && loc.상세주소 !== 'NaN' ? loc.상세주소 : "";
+                        var fullDisplayAddress = baseAddress + (detailAddress ? ' ' + detailAddress : '');
+                        
+                        var safeAddress = baseAddress.replace(/'/g, "\\'"); // 복사할 때는 상세주소 제외하고 기본 주소만 적용
                         var deptInfo = loc.부서 && loc.부서 !== 'NaN' ? '(' + loc.부서 + ')' : '';
                         var currentMemo = loc.메모 && loc.메모 !== 'NaN' ? loc.메모 : "";
 
                         var popupContent = '<div class="popup-box">' +
                             '<b>' + loc.사용자 + '</b> ' + deptInfo + '<br>' +
-                            '<span style="font-size:12px; color:#555;">' + fullAddress + '</span><br>' +
+                            '<span style="font-size:12px; color:#555;">' + fullDisplayAddress + '</span><br>' + // 화면에는 상세주소까지 모두 표시
                             '<button class="copy-btn" onclick="copyAddress(\'' + safeAddress + '\', this)">📋 주소 복사하기</button>' +
                             '<textarea id="memo-' + index + '" class="memo-area" placeholder="특이사항 및 메모 입력...">' + currentMemo + '</textarea>' +
-                            '<button class="save-memo-btn" onclick="saveMemo(\'' + loc.사용자 + '\', ' + index + ', this)">💾 실시간 메모 저장</button>' +
+                            '<button class="save-memo-btn" onclick="saveMemo(\'조성민\', ' + index + ', this)">💾 실시간 메모 저장</button>' +
                             '</div>';
 
                         var marker = L.marker([lat, lng]).addTo(map).bindPopup(popupContent);
