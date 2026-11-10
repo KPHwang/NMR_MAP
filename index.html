@@ -9,10 +9,19 @@
         #header { padding: 12px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         #header h2 { margin: 0; font-size: 18px; }
         
-        .search-box { display: flex; gap: 5px; }
-        .search-box input { padding: 6px 10px; font-size: 14px; width: 180px; border: none; border-radius: 4px; }
-        .search-box button { padding: 6px 12px; font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        /* 검색 및 자동완성 박스 스타일 */
+        .search-container { position: relative; display: flex; gap: 5px; }
+        .search-container input { padding: 6px 10px; font-size: 14px; width: 200px; border: none; border-radius: 4px; }
+        .search-container button { padding: 6px 12px; font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         
+        /* 자동완성 목록 드롭다운 스타일 */
+        #autocomplete-list {
+            position: absolute; top: 35px; left: 0; right: 55px; background: white; border: 1px solid #ccc; border-top: none;
+            z-index: 1000; max-height: 200px; overflow-y: auto; border-radius: 0 0 4px 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .autocomplete-item { padding: 8px 10px; font-size: 13px; color: #333; cursor: pointer; border-bottom: 1px solid #f1f1f1; }
+        .autocomplete-item:hover { background-color: #f8f9fa; color: #007bff; font-weight: bold; }
+
         #map { width: 100%; height: calc(100vh - 60px); }
         .popup-box { font-size: 14px; line-height: 1.4; width: 240px; }
         .popup-box b { font-size: 15px; color: #2c3e50; }
@@ -42,9 +51,11 @@
     <div id="app">
         <div id="header">
             <h2>📍 NMR 실시간 공유 지도</h2>
-            <div class="search-box">
-                <input type="text" id="search-input" placeholder="기관명 또는 부서 입력">
+            <!-- 자동완성 기능이 포함된 검색 영역 -->
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="기관명 또는 부서 입력" autocomplete="off">
                 <button onclick="searchLocation()">검색</button>
+                <div id="autocomplete-list"></div>
             </div>
         </div>
         <div id="map"></div>
@@ -81,35 +92,38 @@
         }).addTo(map);
 
         var markers = [];
+        var rawLocations = []; // 자동완성을 위한 원본 데이터 저장용
 
         function loadMapData() {
             fetch(SHEET_API_URL)
                 .then(response => response.json())
                 .then(locations => {
+                    rawLocations = locations; // 데이터 보관
                     locations.forEach(function(loc, index) {
                         var lat = parseFloat(loc.위도);
                         var lng = parseFloat(loc.경도);
                         if (isNaN(lat) || isNaN(lng)) return;
 
-                        var baseAddress = loc.주소 ? loc.주소.trim() : ""; // 기본 주소만 추출
+                        var baseAddress = loc.주소 ? loc.주소.trim() : "";
                         var detailAddress = loc.상세주소 && loc.상세주소 !== 'NaN' ? loc.상세주소 : "";
                         var fullDisplayAddress = baseAddress + (detailAddress ? ' ' + detailAddress : '');
                         
-                        var safeAddress = baseAddress.replace(/'/g, "\\'"); // 복사할 때는 상세주소 제외하고 기본 주소만 적용
+                        var safeAddress = baseAddress.replace(/'/g, "\\'"); // 복사할 때는 상세주소 제외
                         var deptInfo = loc.부서 && loc.부서 !== 'NaN' ? '(' + loc.부서 + ')' : '';
                         var currentMemo = loc.메모 && loc.메모 !== 'NaN' ? loc.메모 : "";
 
                         var popupContent = '<div class="popup-box">' +
                             '<b>' + loc.사용자 + '</b> ' + deptInfo + '<br>' +
-                            '<span style="font-size:12px; color:#555;">' + fullDisplayAddress + '</span><br>' + // 화면에는 상세주소까지 모두 표시
+                            '<span style="font-size:12px; color:#555;">' + fullDisplayAddress + '</span><br>' +
                             '<button class="copy-btn" onclick="copyAddress(\'' + safeAddress + '\', this)">📋 주소 복사하기</button>' +
                             '<textarea id="memo-' + index + '" class="memo-area" placeholder="특이사항 및 메모 입력...">' + currentMemo + '</textarea>' +
-                            '<button class="save-memo-btn" onclick="saveMemo(\'조성민\', ' + index + ', this)">💾 실시간 메모 저장</button>' +
+                            '<button class="save-memo-btn" onclick="saveMemo(\'' + loc.사용자 + '\', ' + index + ', this)">💾 실시간 메모 저장</button>' +
                             '</div>';
 
                         var marker = L.marker([lat, lng]).addTo(map).bindPopup(popupContent);
                         markers.push({ 
                             name: (loc.사용자 + ' ' + (loc.부서 || '')).toLowerCase(), 
+                            displayName: loc.사용자 + (loc.부서 && loc.부서 !== 'NaN' ? ' (' + loc.부서 + ')' : ''),
                             marker: marker, 
                             lat: lat, 
                             lng: lng 
@@ -118,6 +132,63 @@
                 })
                 .catch(error => console.error('데이터 로드 실패:', error));
         }
+
+        // 🔍 실시간 자동완성 이벤트 리스너
+        document.getElementById('search-input').addEventListener('input', function(e) {
+            var keyword = this.value.trim().toLowerCase();
+            var listContainer = document.getElementById('autocomplete-list');
+            listContainer.innerHTML = ""; // 기존 목록 초기화
+
+            if (!keyword) return;
+
+            // 검색어가 포함된 항목 필터링 (최대 10개까지만 표시)
+            var matches = markers.filter(function(item) {
+                return item.name.includes(keyword);
+            }).slice(0, 10);
+
+            matches.forEach(function(match) {
+                var itemDiv = document.createElement('div');
+                itemDiv.className = 'autocomplete-item';
+                itemDiv.innerText = match.displayName;
+                
+                // 자동완성 항목 클릭 시 해당 위치로 이동 및 팝업 오픈
+                itemDiv.addEventListener('click', function() {
+                    document.getElementById('search-input').value = match.displayName;
+                    listContainer.innerHTML = "";
+                    map.setView([match.lat, match.lng], 16);
+                    match.marker.openPopup();
+                });
+
+                listContainer.appendChild(itemDiv);
+            });
+        });
+
+        // 화면 다른 곳을 누르면 자동완성 목록 닫기
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-container')) {
+                document.getElementById('autocomplete-list').innerHTML = "";
+            }
+        });
+
+        function searchLocation() {
+            var keyword = document.getElementById('search-input').value.trim().toLowerCase();
+            document.getElementById('autocomplete-list').innerHTML = "";
+            if (!keyword) { alert("검색할 기관명 또는 부서를 입력해주세요."); return; }
+            var found = markers.find(function(item) { return item.name.includes(keyword); });
+            if (found) {
+                map.setView([found.lat, found.lng], 16);
+                found.marker.openPopup();
+            } else {
+                alert("일치하는 기관을 찾을 수 없습니다.");
+            }
+        }
+
+        document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') { 
+                document.getElementById('autocomplete-list').innerHTML = "";
+                searchLocation(); 
+            }
+        });
 
         function saveMemo(userName, index, btnElement) {
             var memoText = document.getElementById('memo-' + index).value;
@@ -171,22 +242,6 @@
                 btnElement.style.backgroundColor = originalBg;
             }, 1500);
         }
-
-        function searchLocation() {
-            var keyword = document.getElementById('search-input').value.trim().toLowerCase();
-            if (!keyword) { alert("검색할 기관명 또는 부서를 입력해주세요."); return; }
-            var found = markers.find(function(item) { return item.name.includes(keyword); });
-            if (found) {
-                map.setView([found.lat, found.lng], 16);
-                found.marker.openPopup();
-            } else {
-                alert("일치하는 기관을 찾을 수 없습니다.");
-            }
-        }
-
-        document.getElementById('search-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') { searchLocation(); }
-        });
     </script>
 </body>
 </html>
