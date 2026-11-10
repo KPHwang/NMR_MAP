@@ -6,7 +6,15 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; font-family: sans-serif; }
-        #header { padding: 15px; background: #2c3e50; color: white; text-align: center; }
+        #header { padding: 12px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        #header h2 { margin: 0; font-size: 18px; }
+        
+        /* 검색바 스타일 */
+        .search-box { display: flex; gap: 5px; }
+        .search-box input { padding: 6px 10px; font-size: 14px; width: 180px; border: none; border-radius: 4px; }
+        .search-box button { padding: 6px 12px; font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .search-box button:active { background: #0056b3; }
+
         #map { width: 100%; height: calc(100vh - 60px); }
         .popup-box { font-size: 14px; line-height: 1.4; }
         .popup-box b { font-size: 15px; color: #2c3e50; }
@@ -17,7 +25,6 @@
         }
         .copy-btn:active { background-color: #0056b3; }
         
-        /* 초기에는 지도를 숨김 */
         #app { display: none; }
         #login-screen {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -40,25 +47,28 @@
         </div>
     </div>
 
-    <!-- 실제 지도 앱 화면 (비밀번호 통과 시 노출) -->
+    <!-- 실제 지도 앱 화면 -->
     <div id="app">
         <div id="header">
-            <h2>📍 NMR 사용자 위치 지도</h2>
+            <h2>📍 NMR 사용자 지도</h2>
+            <!-- 검색 창 영역 -->
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="기관명 입력 (예: 서울대학교)">
+                <button onclick="searchLocation()">검색</button>
+            </div>
         </div>
         <div id="map"></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // 설정할 비밀번호
-        var correctPassword = "jk5501"; // 원하시는 비밀번호로 변경하세요
+        var correctPassword = "1234"; // 비밀번호 (원하시는 것으로 변경 가능)
 
         function checkPassword() {
             var inputVal = document.getElementById('password-input').value;
             if (inputVal === correctPassword) {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('app').style.display = 'block';
-                // 지도가 숨겨져 있다가 나타날 때 깨지는 현상을 방지하기 위해 지도 크기 재조정
                 setTimeout(function() { map.invalidateSize(); }, 100);
             } else {
                 alert("비밀번호가 틀렸습니다!");
@@ -66,18 +76,18 @@
             }
         }
 
-        // 엔터키 입력 시 로그인 실행
         document.getElementById('password-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') { checkPassword(); }
         });
 
-        // 지도 초기화 로직
+        // 지도 초기화
         var map = L.map('map').setView([36.3504, 127.3845], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
+        // 전체 위치 데이터 (마커 객체들을 저장할 배열 추가)
         var locations = [
             { name: "리드젠", address: "경기 성남시 중원구 갈마치로244번길 31 현대I벨리", lat: 37.4416, lng: 127.1776 },
             { name: "원광대학교", address: "전북특별자치도 익산시 익산대로 460 원광대학교", lat: 35.9731, lng: 126.9575 },
@@ -149,6 +159,9 @@
             { name: "서울시립대학교", address: "서울특별시 동대문구 서울시립대로 163 서울시립대학교", lat: 37.5839, lng: 127.0589 }
         ];
 
+        // 마커들을 저장해둘 배열
+        var markers = [];
+
         function copyAddress(addressText, btnElement) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(addressText).then(function() {
@@ -181,14 +194,47 @@
             }, 1500);
         }
 
-        locations.forEach(function(loc) {
+        // 마커 생성 및 배열 저장
+        locations.forEach(function(loc, index) {
             var safeAddress = loc.address.replace(/'/g, "\\'");
             var popupContent = '<div class="popup-box">' +
                 '<b>' + loc.name + '</b><br>' +
                 '<span style="font-size:12px; color:#555;">' + loc.address + '</span><br>' +
                 '<button class="copy-btn" onclick="copyAddress(\'' + safeAddress + '\', this)">📋 주소 복사하기</button>' +
                 '</div>';
-            L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(popupContent);
+
+            var marker = L.marker([loc.lat, loc.lng]).addTo(map).bindPopup(popupContent);
+            
+            // 검색을 위해 마커와 이름 매핑 저장
+            markers.push({ name: loc.name.toLowerCase(), marker: marker, lat: loc.lat, lng: loc.lng });
+        });
+
+        // 🔍 검색 함수
+        function searchLocation() {
+            var keyword = document.getElementById('search-input').value.trim().toLowerCase();
+            if (!keyword) {
+                alert("검색할 기관명을 입력해주세요.");
+                return;
+            }
+
+            // 일치하는 항목 찾기 (이름에 검색어가 포함된 경우)
+            var found = markers.find(function(item) {
+                return item.name.includes(keyword);
+            });
+
+            if (found) {
+                // 해당 위치로 지도 이동 (확대 줌 16)
+                map.setView([found.lat, found.lng], 16);
+                // 팝업 열기
+                found.marker.openPopup();
+            } else {
+                alert("일치하는 기관을 찾을 수 없습니다.");
+            }
+        }
+
+        // 엔터키 입력 시 검색 실행
+        document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') { searchLocation(); }
         });
     </script>
 </body>
