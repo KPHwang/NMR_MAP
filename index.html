@@ -2,31 +2,35 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NMR 사용자 위치 지도</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; }
-        #header { padding: 12px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        #header h2 { margin: 0; font-size: 18px; }
+        /* 모바일 대응 레이아웃 구조 개선 */
+        html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; }
         
-        /* 검색 및 버튼 스타일 */
-        .header-right { display: flex; gap: 8px; align-items: center; }
-        .search-container { position: relative; display: flex; gap: 5px; }
-        .search-container input { padding: 6px 10px; font-size: 14px; width: 180px; border: none; border-radius: 4px; }
-        .search-container button, .loc-btn { padding: 6px 12px; font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        #header { padding: 10px 12px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; z-index: 1001; }
+        #header h2 { margin: 0; font-size: 16px; }
+        
+        /* 검색 및 버튼 스타일 (모바일 크기 최적화) */
+        .header-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .search-container { position: relative; display: flex; gap: 4px; }
+        .search-container input { padding: 6px 8px; font-size: 13px; width: 150px; border: none; border-radius: 4px; }
+        .search-container button, .loc-btn { padding: 6px 10px; font-size: 13px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .loc-btn { background: #28a745; }
         
         #autocomplete-list {
-            position: absolute; top: 35px; left: 0; right: 55px; background: white; border: 1px solid #ccc; border-top: none;
-            z-index: 1000; max-height: 200px; overflow-y: auto; border-radius: 0 0 4px 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: absolute; top: 35px; left: 0; right: 45px; background: white; border: 1px solid #ccc; border-top: none;
+            z-index: 2000; max-height: 200px; overflow-y: auto; border-radius: 0 0 4px 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         .autocomplete-item { padding: 8px 10px; font-size: 13px; color: #333; cursor: pointer; border-bottom: 1px solid #f1f1f1; }
         .autocomplete-item:hover { background-color: #f8f9fa; color: #007bff; font-weight: bold; }
 
-        #map { width: 100%; height: calc(100vh - 60px); }
+        /* 지도가 남은 공간을 유연하게 채우도록 설정 */
+        #map { flex-grow: 1; width: 100%; z-index: 1; }
         
         /* 팝업창 내부 스타일 */
-        .popup-box { font-size: 13px; line-height: 1.4; width: 270px; }
+        .popup-box { font-size: 13px; line-height: 1.4; width: 260px; }
         .popup-box b { font-size: 15px; color: #2c3e50; }
         
         .address-display { font-size: 12px; color: #555; margin-top: 4px; background: #f8f9fa; padding: 4px; border-radius: 3px; }
@@ -38,7 +42,7 @@
         .copy-btn { margin-top: 6px; width: 100%; padding: 5px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
         .save-btn { flex: 1; padding: 5px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
         
-        #app { display: none; }
+        #app { display: flex; flex-direction: column; height: 100%; }
         #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f4f6f7; }
         .login-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
         .login-box input { padding: 10px; font-size: 15px; width: 200px; margin-right: 5px; border: 1px solid #ccc; border-radius: 4px; }
@@ -80,7 +84,7 @@
             var inputVal = document.getElementById('password-input').value;
             if (inputVal === correctPassword) {
                 document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('app').style.display = 'block';
+                document.getElementById('app').style.display = 'flex';
                 setTimeout(function() { map.invalidateSize(); }, 100);
                 loadMapData();
             } else {
@@ -148,14 +152,12 @@
                 .catch(error => console.error('데이터 로드 실패:', error));
         }
 
-        // 📍 고성능 GPS를 우선 탐색하는 내 위치 찾기 함수
         function panToMyPosition() {
             if (!navigator.geolocation) {
                 alert("이 브라우저는 위치 정보를 지원하지 않습니다.");
                 return;
             }
             
-            // 위치 정보 허용 알림 표시
             navigator.geolocation.getCurrentPosition(function(position) {
                 var lat = position.coords.latitude;
                 var lng = position.coords.longitude;
@@ -177,7 +179,7 @@
             }, function(error) {
                 alert("위치 정보를 가져올 수 없습니다. GPS(위치 서비스) 권한이 켜져 있는지 확인해주세요.");
             }, { 
-                enableHighAccuracy: true, // 고성능 GPS 사용 강제
+                enableHighAccuracy: true, 
                 timeout: 10000, 
                 maximumAge: 0 
             });
