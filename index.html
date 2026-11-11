@@ -9,10 +9,12 @@
         #header { padding: 12px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         #header h2 { margin: 0; font-size: 18px; }
         
-        /* 검색 및 자동완성 박스 스타일 */
+        /* 검색 및 버튼 스타일 */
+        .header-right { display: flex; gap: 8px; align-items: center; }
         .search-container { position: relative; display: flex; gap: 5px; }
-        .search-container input { padding: 6px 10px; font-size: 14px; width: 200px; border: none; border-radius: 4px; }
-        .search-container button { padding: 6px 12px; font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .search-container input { padding: 6px 10px; font-size: 14px; width: 180px; border: none; border-radius: 4px; }
+        .search-container button, .loc-btn { padding: 6px 12px; font-size: 14px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .loc-btn { background: #28a745; }
         
         #autocomplete-list {
             position: absolute; top: 35px; left: 0; right: 55px; background: white; border: 1px solid #ccc; border-top: none;
@@ -29,8 +31,8 @@
         
         .address-display { font-size: 12px; color: #555; margin-top: 4px; background: #f8f9fa; padding: 4px; border-radius: 3px; }
         .label-text { font-size: 11px; font-weight: bold; color: #666; margin-top: 6px; display: block; }
-        .input-box { width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .memo-area { width: 100%; height: 45px; padding: 4px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; resize: none; box-sizing: border-box; }
+        .input-box { width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .memo-area { width: 100%; height: 45px; padding: 5px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; resize: none; box-sizing: border-box; }
         
         .copy-btn { margin-top: 6px; width: 100%; padding: 5px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
         .save-btn { margin-top: 4px; width: 100%; padding: 6px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
@@ -56,10 +58,13 @@
     <div id="app">
         <div id="header">
             <h2>📍 NMR 실시간 공유 지도</h2>
-            <div class="search-container">
-                <input type="text" id="search-input" placeholder="기관명 또는 부서 입력" autocomplete="off">
-                <button onclick="searchLocation()">검색</button>
-                <div id="autocomplete-list"></div>
+            <div class="header-right">
+                <button class="loc-btn" onclick="panToMyPosition()">📍 내 위치</button>
+                <div class="search-container">
+                    <input type="text" id="search-input" placeholder="기관명 또는 부서 입력" autocomplete="off">
+                    <button onclick="searchLocation()">검색</button>
+                    <div id="autocomplete-list"></div>
+                </div>
             </div>
         </div>
         <div id="map"></div>
@@ -67,9 +72,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        var correctPassword = "jk5501"; // 비밀번호 설정
-        
-        // ★ SheetDB API 주소를 여기에 넣으세요
+        var correctPassword = "jk5501"; 
         var SHEET_API_URL = "https://sheetdb.io/api/v1/mmorvfgec91tr"; 
 
         function checkPassword() {
@@ -96,6 +99,7 @@
         }).addTo(map);
 
         var markers = [];
+        var myLocationMarker = null;
 
         function loadMapData() {
             fetch(SHEET_API_URL)
@@ -111,17 +115,17 @@
                         var currentMemo = loc.메모 && loc.메모 !== 'NaN' ? loc.메모 : "";
                         var deptInfo = loc.부서 && loc.부서 !== 'NaN' ? '(' + loc.부서 + ')' : '';
 
-                        // 팝업창 구성 (기본 주소는 고정 표시, 상세주소와 메모만 수정 가능)
+                        // 팝업창 구성 (상세주소 수정 입력칸 포함)
                         var popupContent = '<div class="popup-box">' +
                             '<b>' + loc.사용자 + '</b> ' + deptInfo + '<br>' +
                             '<div class="address-display">📍 <b>기본 주소:</b><br>' + baseAddress + '</div>' +
                             
                             '<span class="label-text">상세주소 수정 (건물/층수)</span>' +
-                            '<input type="text" id="detail-' + index + '" class="input-box" value="' + detailAddress + '">' +
+                            '<input type="text" id="detail-' + index + '" class="input-box" value="' + detailAddress + '" placeholder="예: 약학관 2층">' +
                             
                             '<button class="copy-btn" onclick="copyAddress(\'' + baseAddress.replace(/'/g, "\\'") + '\', this)">📋 기본주소 복사하기</button>' +
                             
-                            '<span class="label-text">메모</span>' +
+                            '<span class="label-text">특이사항 및 메모</span>' +
                             '<textarea id="memo-' + index + '" class="memo-area" placeholder="특이사항 입력...">' + currentMemo + '</textarea>' +
                             
                             '<button class="save-btn" onclick="saveData(\'' + loc.사용자 + '\', ' + index + ', this)">💾 상세주소 및 메모 저장</button>' +
@@ -138,6 +142,35 @@
                     });
                 })
                 .catch(error => console.error('데이터 로드 실패:', error));
+        }
+
+        // 📍 내 위치 찾기 및 지도 이동 기능
+        function panToMyPosition() {
+            if (!navigator.geolocation) {
+                alert("이 브라우저는 위치 정보를 지원하지 않습니다.");
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+
+                map.setView([lat, lng], 16);
+
+                if (myLocationMarker) {
+                    map.removeLayer(myLocationMarker);
+                }
+
+                myLocationMarker = L.circleMarker([lat, lng], {
+                    radius: 9,
+                    fillColor: "#007bff",
+                    color: "#fff",
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).addTo(map).bindPopup("<b>현재 나의 위치</b>").openPopup();
+            }, function() {
+                alert("위치 정보를 가져올 수 없습니다. GPS 권한을 확인해주세요.");
+            }, { enableHighAccuracy: true });
         }
 
         // 💾 상세주소와 메모 변경사항을 구글 시트에 실시간 저장하는 함수
@@ -230,7 +263,7 @@
         });
 
         function searchLocation() {
-            var keyword = document.getElementById('search-input').value.trim().toLowerCase();
+            var keyword = document.getElementById('search-input'].value.trim().toLowerCase();
             document.getElementById('autocomplete-list').innerHTML = "";
             if (!keyword) { alert("검색할 기관명 또는 부서를 입력해주세요."); return; }
             var found = markers.find(function(item) { return item.name.includes(keyword); });
