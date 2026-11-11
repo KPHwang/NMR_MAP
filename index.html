@@ -60,7 +60,6 @@
         <div id="header">
             <h2>📍 NMR 실시간 공유 지도</h2>
             <div class="header-right">
-                <!-- 내 위치 버튼 추가됨 -->
                 <button class="loc-btn" onclick="panToMyPosition()">📍 내 위치</button>
                 <div class="search-container">
                     <input type="text" id="search-input" placeholder="기관명 또는 부서 입력" autocomplete="off">
@@ -117,7 +116,6 @@
                         var currentMemo = loc.메모 && loc.메모 !== 'NaN' ? loc.메모 : "";
                         var deptInfo = loc.부서 && loc.부서 !== 'NaN' ? '(' + loc.부서 + ')' : '';
 
-                        // 팝업창 구성 (상세주소 저장 버튼과 메모 저장 버튼 각각 분리됨)
                         var popupContent = '<div class="popup-box">' +
                             '<b>' + loc.사용자 + '</b> ' + deptInfo + '<br>' +
                             '<div class="address-display">📍 <b>기본 주소:</b><br>' + baseAddress + '</div>' +
@@ -129,6 +127,4 @@
                             '</div>' +
                             
                             '<span class="label-text">특이사항 및 메모</span>' +
-                            '<textarea id="memo-' + index + '" class="memo-area" placeholder="특이사항 입력...">' + currentMemo + '</textarea>' +
-                            '<div class="row-group">' +
-                                '<button class="save-btn" style="background-color: #17a2b8;" onclick="saveField(\'' + loc.사용자 + '\', \'메모\', \'memo-' + index + '\', this)">
+                            '<textarea id="memo
