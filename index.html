@@ -127,4 +127,169 @@
                             '</div>' +
                             
                             '<span class="label-text">특이사항 및 메모</span>' +
-                            '<textarea id="memo
+                            '<textarea id="memo-' + index + '" class="memo-area" placeholder="특이사항 입력...">' + currentMemo + '</textarea>' +
+                            '<div class="row-group">' +
+                                '<button class="save-btn" style="background-color: #17a2b8;" onclick="saveField(\'' + loc.사용자 + '\', \'메모\', \'memo-' + index + '\', this)">💾 메모 저장</button>' +
+                            '</div>' +
+                            
+                            '<button class="copy-btn" onclick="copyAddress(\'' + baseAddress.replace(/'/g, "\\'") + '\', this)">📋 기본주소 클립보드 복사</button>' +
+                            '</div>';
+
+                        var marker = L.marker([lat, lng]).addTo(map).bindPopup(popupContent);
+                        markers.push({ 
+                            name: (loc.사용자 + ' ' + (loc.부서 || '')).toLowerCase(), 
+                            displayName: loc.사용자 + (loc.부서 && loc.부서 !== 'NaN' ? ' (' + loc.부서 + ')' : ''),
+                            marker: marker, 
+                            lat: lat, 
+                            lng: lng 
+                        });
+                    });
+                })
+                .catch(error => console.error('데이터 로드 실패:', error));
+        }
+
+        // 📍 고성능 GPS를 우선 탐색하는 내 위치 찾기 함수
+        function panToMyPosition() {
+            if (!navigator.geolocation) {
+                alert("이 브라우저는 위치 정보를 지원하지 않습니다.");
+                return;
+            }
+            
+            // 위치 정보 허용 알림 표시
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+
+                map.setView([lat, lng], 16);
+
+                if (myLocationMarker) {
+                    map.removeLayer(myLocationMarker);
+                }
+
+                myLocationMarker = L.circleMarker([lat, lng], {
+                    radius: 10,
+                    fillColor: "#ff4757",
+                    color: "#fff",
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).addTo(map).bindPopup("<b>📍 현재 나의 위치</b>").openPopup();
+            }, function(error) {
+                alert("위치 정보를 가져올 수 없습니다. GPS(위치 서비스) 권한이 켜져 있는지 확인해주세요.");
+            }, { 
+                enableHighAccuracy: true, // 고성능 GPS 사용 강제
+                timeout: 10000, 
+                maximumAge: 0 
+            });
+        }
+
+        function saveField(userName, fieldName, inputId, btnElement) {
+            var val = document.getElementById(inputId).value;
+            var updateData = {};
+            updateData[fieldName] = val;
+
+            fetch(SHEET_API_URL + '/사용자/' + encodeURIComponent(userName), {
+                method: 'PUT',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ data: updateData })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('서버 응답 오류');
+                return response.json();
+            })
+            .then(data => {
+                showSuccess(btnElement, "✨ 저장 완료!", "#28a745");
+            })
+            .catch(error => {
+                alert("저장에 실패했습니다. 네트워크 연결을 확인해주세요.");
+            });
+        }
+
+        function copyAddress(addressText, btnElement) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(addressText).then(function() {
+                    showSuccess(btnElement, "📋 복사 완료!", "#007bff");
+                }).catch(function() { fallbackCopy(addressText, btnElement); });
+            } else { fallbackCopy(addressText, btnElement); }
+        }
+
+        function fallbackCopy(text, btnElement) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                if (document.execCommand('copy')) { showSuccess(btnElement, "📋 복사 완료!", "#007bff"); }
+                else { alert("복사에 실패했습니다."); }
+            } catch (err) { alert("복사를 지원하지 않는 환경입니다."); }
+            document.body.removeChild(textArea);
+        }
+
+        function showSuccess(btnElement, message, successColor) {
+            var originalText = btnElement.innerText;
+            var originalBg = btnElement.style.backgroundColor;
+            btnElement.innerText = message;
+            btnElement.style.backgroundColor = successColor;
+            setTimeout(function() {
+                btnElement.innerText = originalText;
+                btnElement.style.backgroundColor = originalBg;
+            }, 1500);
+        }
+
+        document.getElementById('search-input').addEventListener('input', function(e) {
+            var keyword = this.value.trim().toLowerCase();
+            var listContainer = document.getElementById('autocomplete-list');
+            listContainer.innerHTML = "";
+            if (!keyword) return;
+
+            var matches = markers.filter(function(item) {
+                return item.name.includes(keyword);
+            }).slice(0, 10);
+
+            matches.forEach(function(match) {
+                var itemDiv = document.createElement('div');
+                itemDiv.className = 'autocomplete-item';
+                itemDiv.innerText = match.displayName;
+                itemDiv.addEventListener('click', function() {
+                    document.getElementById('search-input').value = match.displayName;
+                    listContainer.innerHTML = "";
+                    map.setView([match.lat, match.lng], 16);
+                    match.marker.openPopup();
+                });
+                listContainer.appendChild(itemDiv);
+            });
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-container')) {
+                document.getElementById('autocomplete-list').innerHTML = "";
+            }
+        });
+
+        function searchLocation() {
+            var keyword = document.getElementById('search-input').value.trim().toLowerCase();
+            document.getElementById('autocomplete-list').innerHTML = "";
+            if (!keyword) { alert("검색할 기관명 또는 부서를 입력해주세요."); return; }
+            var found = markers.find(function(item) { return item.name.includes(keyword); });
+            if (found) {
+                map.setView([found.lat, found.lng], 16);
+                found.marker.openPopup();
+            } else {
+                alert("일치하는 기관을 찾을 수 없습니다.");
+            }
+        }
+
+        document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') { 
+                document.getElementById('autocomplete-list').innerHTML = "";
+                searchLocation(); 
+            }
+        });
+    </script>
+</body>
+</html>
