@@ -6,35 +6,22 @@
     <title>NMR 사용자 위치 지도</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* 전체 레이아웃 고정 */
         html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; background: #2c3e50; }
         
-        /* 🔒 보안 로그인 화면 (화면 전체를 완벽하게 덮도록 fixed 적용) */
         #login-screen { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: #2c3e50; 
-            z-index: 99999; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; z-index: 99999; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
         }
         .login-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-align: center; width: 85%; max-width: 320px; box-sizing: border-box; }
         .login-box h3 { margin-top: 0; color: #2c3e50; }
         .login-box input { padding: 10px; font-size: 15px; width: 100%; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         .login-box button { padding: 10px; font-size: 15px; width: 100%; background: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
 
-        /* 메인 앱 화면 */
         #app { display: none; flex-direction: column; height: 100%; width: 100%; }
 
         #header { padding: 10px 12px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; z-index: 1001; border-bottom: 1px solid #1a252f; }
         #header h2 { margin: 0; font-size: 16px; }
         
-        /* 검색 및 버튼 스타일 (모바일 최적화) */
         .header-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
         .search-container { position: relative; display: flex; gap: 4px; }
         .search-container input { padding: 6px 8px; font-size: 13px; width: 150px; border: none; border-radius: 4px; }
@@ -48,26 +35,40 @@
         .autocomplete-item { padding: 8px 10px; font-size: 13px; color: #333; cursor: pointer; border-bottom: 1px solid #f1f1f1; }
         .autocomplete-item:hover { background-color: #f8f9fa; color: #007bff; font-weight: bold; }
 
-        /* 지도가 남은 공간 채우기 */
         #map { flex-grow: 1; width: 100%; z-index: 1; }
         
         /* 팝업창 내부 스타일 */
-        .popup-box { font-size: 13px; line-height: 1.4; width: 260px; }
+        .popup-box { font-size: 13px; line-height: 1.4; width: 270px; }
         .popup-box b { font-size: 15px; color: #2c3e50; }
         
-        .address-display { font-size: 12px; color: #555; margin-top: 4px; background: #f8f9fa; padding: 4px; border-radius: 3px; }
-        .label-text { font-size: 11px; font-weight: bold; color: #666; margin-top: 6px; display: block; }
+        .address-display { font-size: 12px; color: #555; margin-top: 4px; background: #f8f9fa; padding: 6px; border-radius: 4px; border: 1px solid #e9ecef; }
+        .label-text { font-size: 11px; font-weight: bold; color: #666; margin-top: 8px; display: block; }
         .input-box { width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         .memo-area { width: 100%; height: 40px; padding: 5px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; resize: none; box-sizing: border-box; }
         
         .row-group { display: flex; gap: 4px; margin-top: 4px; }
-        .copy-btn { margin-top: 6px; width: 100%; padding: 5px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
+        
+        /* 눈에 잘 띄는 주황색 계열의 '기본주소 복사' 버튼 스타일 */
+        .copy-btn { 
+            margin-top: 5px; 
+            width: 100%; 
+            padding: 6px; 
+            background-color: #fd7e14; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 12px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .copy-btn:hover { background-color: #e8590c; }
+
         .save-btn { flex: 1; padding: 5px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
     </style>
 </head>
 <body>
 
-    <!-- 🔒 보안 로그인 화면 (전체 화면 덮기 적용 완료) -->
     <div id="login-screen">
         <div class="login-box">
             <h3>🔒 보안 접속</h3>
@@ -77,7 +78,6 @@
         </div>
     </div>
 
-    <!-- 메인 앱 화면 -->
     <div id="app">
         <div id="header">
             <h2>📍 NMR 실시간 공유 지도</h2>
@@ -101,9 +101,7 @@
         function checkPassword() {
             var inputVal = document.getElementById('password-input').value;
             if (inputVal === correctPassword) {
-                // 로그인 화면 숨기기
                 document.getElementById('login-screen').style.display = 'none';
-                // 메인 앱 화면 보이기 (flex로 설정하여 레이아웃 유지)
                 document.getElementById('app').style.display = 'flex';
                 setTimeout(function() { map.invalidateSize(); }, 100);
                 loadMapData();
@@ -140,9 +138,13 @@
                         var currentMemo = loc.메모 && loc.메모 !== 'NaN' ? loc.메모 : "";
                         var deptInfo = loc.부서 && loc.부서 !== 'NaN' ? '(' + loc.부서 + ')' : '';
 
+                        // 팝업창 구성: 기본주소 바로 아래에 눈에 띄는 주황색 '기본주소 복사' 버튼 배치
                         var popupContent = '<div class="popup-box">' +
                             '<b>' + loc.사용자 + '</b> ' + deptInfo + '<br>' +
                             '<div class="address-display">📍 <b>기본 주소:</b><br>' + baseAddress + '</div>' +
+                            
+                            // 기본주소 바로 아래로 이동한 복사 버튼 (주황색 포인트)
+                            '<button class="copy-btn" onclick="copyAddress(\'' + baseAddress.replace(/'/g, "\\'") + '\', this)">📋 기본주소 복사</button>' +
                             
                             '<span class="label-text">상세주소 (건물/층수)</span>' +
                             '<input type="text" id="detail-' + index + '" class="input-box" value="' + detailAddress + '" placeholder="예: 약학관 2층">' +
@@ -155,8 +157,6 @@
                             '<div class="row-group">' +
                                 '<button class="save-btn" style="background-color: #17a2b8;" onclick="saveField(\'' + loc.사용자 + '\', \'메모\', \'memo-' + index + '\', this)">💾 메모 저장</button>' +
                             '</div>' +
-                            
-                            '<button class="copy-btn" onclick="copyAddress(\'' + baseAddress.replace(/'/g, "\\'") + '\', this)">📋 기본주소 클립보드 복사</button>' +
                             '</div>';
 
                         var marker = L.marker([lat, lng]).addTo(map).bindPopup(popupContent);
@@ -233,7 +233,7 @@
         function copyAddress(addressText, btnElement) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(addressText).then(function() {
-                    showSuccess(btnElement, "📋 복사 완료!", "#007bff");
+                    showSuccess(btnElement, "📋 복사 완료!", "#fd7e14");
                 }).catch(function() { fallbackCopy(addressText, btnElement); });
             } else { fallbackCopy(addressText, btnElement); }
         }
@@ -246,7 +246,7 @@
             textArea.focus();
             textArea.select();
             try {
-                if (document.execCommand('copy')) { showSuccess(btnElement, "📋 복사 완료!", "#007bff"); }
+                if (document.execCommand('copy')) { showSuccess(btnElement, "📋 복사 완료!", "#fd7e14"); }
                 else { alert("복사에 실패했습니다."); }
             } catch (err) { alert("복사를 지원하지 않는 환경입니다."); }
             document.body.removeChild(textArea);
