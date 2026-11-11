@@ -9,7 +9,6 @@
         #header { padding: 12px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         #header h2 { margin: 0; font-size: 18px; }
         
-        /* 검색 및 버튼 스타일 */
         .header-right { display: flex; gap: 8px; align-items: center; }
         .search-container { position: relative; display: flex; gap: 5px; }
         .search-container input { padding: 6px 10px; font-size: 14px; width: 180px; border: none; border-radius: 4px; }
@@ -26,16 +25,17 @@
         #map { width: 100%; height: calc(100vh - 60px); }
         
         /* 팝업창 내부 스타일 */
-        .popup-box { font-size: 13px; line-height: 1.4; width: 260px; }
+        .popup-box { font-size: 13px; line-height: 1.4; width: 270px; }
         .popup-box b { font-size: 15px; color: #2c3e50; }
         
         .address-display { font-size: 12px; color: #555; margin-top: 4px; background: #f8f9fa; padding: 4px; border-radius: 3px; }
         .label-text { font-size: 11px; font-weight: bold; color: #666; margin-top: 6px; display: block; }
         .input-box { width: 100%; padding: 5px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .memo-area { width: 100%; height: 45px; padding: 5px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; resize: none; box-sizing: border-box; }
+        .memo-area { width: 100%; height: 40px; padding: 5px 6px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; resize: none; box-sizing: border-box; }
         
-        .copy-btn { margin-top: 6px; width: 100%; padding: 5px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
-        .save-btn { margin-top: 4px; width: 100%; padding: 6px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .row-group { display: flex; gap: 4px; margin-top: 4px; }
+        .copy-btn { margin-top: 6px; width: 100%; padding: 5px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
+        .save-btn { flex: 1; padding: 5px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
         
         #app { display: none; }
         #login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f4f6f7; }
@@ -115,172 +115,24 @@
                         var currentMemo = loc.메모 && loc.메모 !== 'NaN' ? loc.메모 : "";
                         var deptInfo = loc.부서 && loc.부서 !== 'NaN' ? '(' + loc.부서 + ')' : '';
 
-                        // 팝업창 구성 (상세주소 수정 입력칸 포함)
+                        // 팝업창 구성 (상세주소와 메모 저장 버튼을 각각 분리)
                         var popupContent = '<div class="popup-box">' +
                             '<b>' + loc.사용자 + '</b> ' + deptInfo + '<br>' +
                             '<div class="address-display">📍 <b>기본 주소:</b><br>' + baseAddress + '</div>' +
                             
-                            '<span class="label-text">상세주소 수정 (건물/층수)</span>' +
+                            '<span class="label-text">상세주소 (건물/층수)</span>' +
                             '<input type="text" id="detail-' + index + '" class="input-box" value="' + detailAddress + '" placeholder="예: 약학관 2층">' +
-                            
-                            '<button class="copy-btn" onclick="copyAddress(\'' + baseAddress.replace(/'/g, "\\'") + '\', this)">📋 기본주소 복사하기</button>' +
+                            '<div class="row-group">' +
+                                '<button class="save-btn" onclick="saveField(\'' + loc.사용자 + '\', \'상세주소\', \'detail-' + index + '\', this)">💾 상세주소 저장</button>' +
+                            '</div>' +
                             
                             '<span class="label-text">특이사항 및 메모</span>' +
                             '<textarea id="memo-' + index + '" class="memo-area" placeholder="특이사항 입력...">' + currentMemo + '</textarea>' +
+                            '<div class="row-group">' +
+                                '<button class="save-btn" style="background-color: #17a2b8;" onclick="saveField(\'' + loc.사용자 + '\', \'메모\', \'memo-' + index + '\', this)">💾 메모 저장</button>' +
+                            '</div>' +
                             
-                            '<button class="save-btn" onclick="saveData(\'' + loc.사용자 + '\', ' + index + ', this)">💾 상세주소 및 메모 저장</button>' +
+                            '<button class="copy-btn" onclick="copyAddress(\'' + baseAddress.replace(/'/g, "\\'") + '\', this)">📋 기본주소 클립보드 복사</button>' +
                             '</div>';
 
-                        var marker = L.marker([lat, lng]).addTo(map).bindPopup(popupContent);
-                        markers.push({ 
-                            name: (loc.사용자 + ' ' + (loc.부서 || '')).toLowerCase(), 
-                            displayName: loc.사용자 + (loc.부서 && loc.부서 !== 'NaN' ? ' (' + loc.부서 + ')' : ''),
-                            marker: marker, 
-                            lat: lat, 
-                            lng: lng 
-                        });
-                    });
-                })
-                .catch(error => console.error('데이터 로드 실패:', error));
-        }
-
-        // 📍 내 위치 찾기 및 지도 이동 기능
-        function panToMyPosition() {
-            if (!navigator.geolocation) {
-                alert("이 브라우저는 위치 정보를 지원하지 않습니다.");
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(function(position) {
-                var lat = position.coords.latitude;
-                var lng = position.coords.longitude;
-
-                map.setView([lat, lng], 16);
-
-                if (myLocationMarker) {
-                    map.removeLayer(myLocationMarker);
-                }
-
-                myLocationMarker = L.circleMarker([lat, lng], {
-                    radius: 9,
-                    fillColor: "#007bff",
-                    color: "#fff",
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.9
-                }).addTo(map).bindPopup("<b>현재 나의 위치</b>").openPopup();
-            }, function() {
-                alert("위치 정보를 가져올 수 없습니다. GPS 권한을 확인해주세요.");
-            }, { enableHighAccuracy: true });
-        }
-
-        // 💾 상세주소와 메모 변경사항을 구글 시트에 실시간 저장하는 함수
-        function saveData(userName, index, btnElement) {
-            var newDetail = document.getElementById('detail-' + index).value;
-            var newMemo = document.getElementById('memo-' + index).value;
-
-            fetch(SHEET_API_URL + '/사용자/' + encodeURIComponent(userName), {
-                method: 'PUT',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    data: { 
-                        '상세주소': newDetail,
-                        '메모': newMemo 
-                    }
-                })
-            }).then(response => response.json())
-              .then(data => {
-                  showSuccess(btnElement, "✨ 실시간 저장 완료!", "#28a745");
-              }).catch(error => {
-                  alert("저장에 실패했습니다.");
-              });
-        }
-
-        function copyAddress(addressText, btnElement) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(addressText).then(function() {
-                    showSuccess(btnElement, "📋 주소 복사 완료!", "#007bff");
-                }).catch(function() { fallbackCopy(addressText, btnElement); });
-            } else { fallbackCopy(addressText, btnElement); }
-        }
-
-        function fallbackCopy(text, btnElement) {
-            var textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                if (document.execCommand('copy')) { showSuccess(btnElement, "📋 주소 복사 완료!", "#007bff"); }
-                else { alert("복사에 실패했습니다."); }
-            } catch (err) { alert("복사를 지원하지 않는 환경입니다."); }
-            document.body.removeChild(textArea);
-        }
-
-        function showSuccess(btnElement, message, successColor) {
-            var originalText = btnElement.innerText;
-            var originalBg = btnElement.style.backgroundColor;
-            btnElement.innerText = message;
-            btnElement.style.backgroundColor = successColor;
-            setTimeout(function() {
-                btnElement.innerText = originalText;
-                btnElement.style.backgroundColor = originalBg;
-            }, 1500);
-        }
-
-        // 실시간 자동완성 검색
-        document.getElementById('search-input').addEventListener('input', function(e) {
-            var keyword = this.value.trim().toLowerCase();
-            var listContainer = document.getElementById('autocomplete-list');
-            listContainer.innerHTML = "";
-            if (!keyword) return;
-
-            var matches = markers.filter(function(item) {
-                return item.name.includes(keyword);
-            }).slice(0, 10);
-
-            matches.forEach(function(match) {
-                var itemDiv = document.createElement('div');
-                itemDiv.className = 'autocomplete-item';
-                itemDiv.innerText = match.displayName;
-                itemDiv.addEventListener('click', function() {
-                    document.getElementById('search-input').value = match.displayName;
-                    listContainer.innerHTML = "";
-                    map.setView([match.lat, match.lng], 16);
-                    match.marker.openPopup();
-                });
-                listContainer.appendChild(itemDiv);
-            });
-        });
-
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.search-container')) {
-                document.getElementById('autocomplete-list').innerHTML = "";
-            }
-        });
-
-        function searchLocation() {
-            var keyword = document.getElementById('search-input'].value.trim().toLowerCase();
-            document.getElementById('autocomplete-list').innerHTML = "";
-            if (!keyword) { alert("검색할 기관명 또는 부서를 입력해주세요."); return; }
-            var found = markers.find(function(item) { return item.name.includes(keyword); });
-            if (found) {
-                map.setView([found.lat, found.lng], 16);
-                found.marker.openPopup();
-            } else {
-                alert("일치하는 기관을 찾을 수 없습니다.");
-            }
-        }
-
-        document.getElementById('search-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') { 
-                document.getElementById('autocomplete-list').innerHTML = "";
-                searchLocation(); 
-            }
-        });
-    </script>
-</body>
-</html>
+                        var marker
